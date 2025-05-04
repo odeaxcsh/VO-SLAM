@@ -57,23 +57,53 @@ public:
 class KeyPointVOEstimator : public VOEstimator
 {
 public:
+    enum class FeatureType {ORB, SIFT};
+
     OdometryStatus estimateMotion(const cv::Mat& img_prev, const cv::Mat& img_curr, const cv::Mat& K) override;
-};
 
-
-
-class MapBasedVOEstimator
-public:
-    MapBasedVOEstimator(const std::vector<cv::Point3f>& map_points) : map_points_(map_points) {}
-    OdometryStatus estiamteGlobalMotion(std::vector<cv::Point2f>& pts_prev, std::vector<cv::Point2f>& pts_curr, const cv::Mat& K)
-    {
-        return status;
-    }
-
+    void setFeatureType(FeatureType type);
 private:
-    std::vector<cv::Point3f> map_points_;
+    /* Ratio for Lowe Test */
+    double LoweRatio = 0.7;
+    /* Feature matching algorithm */
+    FeatureType type = FeatureType::ORB;
+    /* Number of features for ORB and SIFT */
+    int nFeatures = 10000;
+
+    /* Orb param: scaleFactor */
+    float scaleFactor = 1.2f;
+    /* Orb param: nLevels */
+    int nLevels = 8;
+    /* Orb param: orbEdgeThreshold */
+    int orbEdgeThreshold = 31;
+    /* Orb param: patchSize */
+    int patchSize = 31;
+    /* Orb param: firstLevel */
+    int firstLevel = 0;
+    /* Orb param: WTA_K */
+    int WTA_K = 2;
+
+    /* Sift param: nOctaveLayers */
+    int nOctaveLayers = 3;
+    /* Sift param: contrastThreshold */
+    double contrastThreshold = 0.04;
+    /* Sift param: edgeThreshold */
+    double siftEdgeThreshold = 10;
+    /* Sift param: sigma */
+    double sigma = 1.6;
 };
 
+// class MapBasedVOEstimator {
+// public:
+//     MapBasedVOEstimator(const std::vector<cv::Point3f>& map_points) : map_points_(map_points) {}
+//     OdometryStatus estiamteGlobalMotion(std::vector<cv::Point2f>& pts_prev, std::vector<cv::Point2f>& pts_curr, const cv::Mat& K)
+//     {
+//         return status;
+//     }
+//
+// private:
+//     std::vector<cv::Point3f> map_points_;
+// };
 
 
 

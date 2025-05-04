@@ -113,9 +113,15 @@ OdometryStatus KeyPointVOEstimator::estimateMotion(const cv::Mat& img_prev, cons
     std::vector<cv::KeyPoint> keypoints_prev, keypoints_curr;
     cv::Mat descriptors_prev, descriptors_curr;
 
-    cv::Ptr<cv::ORB> orb = cv::ORB::create(10000, 1.2f, 8, 31, 0, 2, cv::ORB::HARRIS_SCORE, 31);
-    orb->detectAndCompute(img_prev, cv::noArray(), keypoints_prev, descriptors_prev);
-    orb->detectAndCompute(img_curr, cv::noArray(), keypoints_curr, descriptors_curr);
+    if (type == FeatureType::ORB) {
+        cv::Ptr<cv::ORB> orb = cv::ORB::create(nFeatures, scaleFactor, nLevels, orbEdgeThreshold, firstLevel, WTA_K, cv::ORB::HARRIS_SCORE, patchSize);
+        orb->detectAndCompute(img_prev, cv::noArray(), keypoints_prev, descriptors_prev);
+        orb->detectAndCompute(img_curr, cv::noArray(), keypoints_curr, descriptors_curr);
+    } else if (type == FeatureType::SIFT) {
+        cv::Ptr<cv::SIFT> sift = cv::SIFT::create(nFeatures, nOctaveLayers, contrastThreshold, siftEdgeThreshold, sigma);
+        sift->detectAndCompute(img_prev, cv::noArray(), keypoints_prev, descriptors_prev);
+        sift->detectAndCompute(img_curr, cv::noArray(), keypoints_curr, descriptors_curr);
+    }
 
     std::vector<std::vector<cv::DMatch>> knn_matches;
     cv::BFMatcher matcher(cv::NORM_HAMMING);
@@ -126,7 +132,7 @@ OdometryStatus KeyPointVOEstimator::estimateMotion(const cv::Mat& img_prev, cons
         if (knn_matches[i].size() < 2)
             continue;
 
-        if (knn_matches[i][0].distance < 0.7 * knn_matches[i][1].distance)
+        if (knn_matches[i][0].distance < LoweRatio * knn_matches[i][1].distance)
             good_matches.push_back(knn_matches[i][0]);
     }
     
@@ -170,4 +176,9 @@ OdometryStatus KeyPointVOEstimator::estimateMotion(const cv::Mat& img_prev, cons
     triangulatePoints(status, K);
     return status;
 }
+
+void KeyPointVOEstimator::setFeatureType(FeatureType type) {
+    this->type = type;
+}
+
 

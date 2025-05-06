@@ -4,20 +4,26 @@
 	"name": "CV Dev Container",
 	"build": {
 		"dockerfile": "Dockerfile"
-	}
-
+	},
+	"mounts": [
+		"source=/tmp/.X11-unix,target=/tmp/.X11-unix,type=bind,consistency=cached"
+	],
+	"runArgs": [
+		"--net",
+		"host",
+		"-v",
+		"${localEnv:HOME}/.Xauthority:/root/.Xauthority",
+		"-e",
+		"DISPLAY=${localEnv:DISPLAY}"
+	]
 	// Features to add to the dev container. More info: https://containers.dev/features.
 	// "features": {},
-
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
 	// "forwardPorts": [],
-
 	// Use 'postCreateCommand' to run commands after the container is created.
 	// "postCreateCommand": "gcc -v",
-
 	// Configure tool-specific properties.
 	// "customizations": {},
-
 	// Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
 	// "remoteUser": "root"
 }

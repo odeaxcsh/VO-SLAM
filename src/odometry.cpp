@@ -124,7 +124,7 @@ OdometryStatus KeyPointVOEstimator::estimateMotion(const cv::Mat& img_prev, cons
     }
 
     std::vector<std::vector<cv::DMatch>> knn_matches;
-    cv::BFMatcher matcher(cv::NORM_HAMMING);
+    cv::BFMatcher matcher((type == FeatureType::ORB) ? cv::NORM_HAMMING : cv::NORM_L2); 
     matcher.knnMatch(descriptors_prev, descriptors_curr, knn_matches, 2);
     
     std::vector<cv::DMatch> good_matches;

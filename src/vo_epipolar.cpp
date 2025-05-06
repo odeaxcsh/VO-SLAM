@@ -92,7 +92,8 @@ int main()
     const char* traj_file = "vo_epipolar.xyz";
 
     bool initialized = false;
-    MotionKalmanFilter kalman_filter;
+    // MotionKalmanFilter kalman_filter;
+    cv::KalmanFilter kalman_filter;
 
     cv::VideoCapture video;
     if (!video.open(video_file)) return -1;
@@ -123,6 +124,10 @@ int main()
     std::shared_ptr<VOEstimator> Odometry = std::make_shared<KeyPointVOEstimator>();
     auto KeyFrameSelector = KeyFrameSelection({Mode::FRAME_INTERVAL}, {1});
     
+    // RH: Declare and init measurement vector: len(6) <- (trans, rpy_euler)
+    cv::Mat measurements(6, 1, CV_64FC1); measurements.setTo(cv::Scalar(0));
+    // bool good_measurement = false;
+
     while (true) {
         cv::Mat img, gray;
         video >> img;  // Grab an image from the video
@@ -158,8 +163,10 @@ int main()
         cv::Affine3d camera_pose_affine = cv::Affine3d(camera_pose);
         cv::Matx<double, 3, 3> R = camera_pose_affine.rotation();
         cv::Vec3d t = camera_pose_affine.translation();
-        cv::Vec3d cam_pos = t;
-
+        
+        // RH: Create copies (should really declare these above the loop for speed, but unsure it matters)
+        cv::Mat R_est = cv::Mat(R);
+        cv::Mat t_est = cv::Mat(t);
 
         double x = t[0], y = t[1], z = t[2];
         cv::String info = cv::format("Inliers: %d (%d%%),  XYZ: [%.3f, %.3f, %.3f]", status.inlier_num, status.inlier_ratio*100, x, y, z);
@@ -168,21 +175,38 @@ int main()
 
 
         if (!initialized) {
-            kalman_filter.initialize(cam_pos);
+            // kalman_filter.initialize(cam_pos);
+
+            // RH: 9 pos + 9 orient (dynamics), 3 xyz + 3 rpy (measurement), 0 u (controls), fps=1/30
+            initKalmanFilter(kalman_filter, 18, 6, 0, (1/30));
             initialized = true;
         }
-        cv::Point3d predicted_pos = kalman_filter.predict();
-        cv::Point3d filtered_pos = kalman_filter.correct(cam_pos);
+        // cv::Point3d predicted_pos = kalman_filter.predict();
+        // cv::Point3d filtered_pos = kalman_filter.correct(cam_pos);
 
-        trajectory.push_back(cam_pos);
-        predicted_points_3d.push_back(predicted_pos);
-        corrected_points_3d.push_back(filtered_pos);
+        // RH: Should only update measurement vector if the latest estimate is good!!!
+        // if (bgoodMeasurement) {...}
+        fillMeasurements( measurements, t_est, R_est );
+
+        // RH: Should I have this return the prediction too?
+        // cv::Mat t_est(3, 1, CV_64FC1);
+        // cv::Mat R_est(3, 3, CV_64FC1);
+        updateKalmanFilter( kalman_filter, measurements, t_est, R_est);
+
+        // RH: USE t_est as corrected position!!! AND USE R_est as corrected orientation!!!
+        cv::Point3d t_corr = cv::Point3d(t_est);
+
+        trajectory.push_back(t_corr);
+        // predicted_points_3d.push_back(t_pred);
+        corrected_points_3d.push_back(t_corr); // RH: Are filtered_pos and cam_pos not the same?
+
+        // Use estimated and corrected R_est and t_est pose
         for (int i = 0; i < status.pts_3d.size(); i++) {
             if (status.inlier_mask.at<uchar>(i) > 0) {
                 cv::Point3d p = status.pts_3d[i];
                 cv::Mat p_vec = (cv::Mat_<double>(3,1) << p.x, p.y, p.z);
-                cv::Mat p_rotated = (R * p_vec);
-                cv::Mat p_trans = p_rotated + t;
+                cv::Mat p_rotated = (R_est * p_vec);
+                cv::Mat p_trans = p_rotated + t_est;
                 points_3d.push_back(cv::Point3d(
                     p_trans.at<double>(0),
                     p_trans.at<double>(1),
@@ -194,12 +218,14 @@ int main()
 
 
         auto vis = visualizeTrajectory(trajectory, 1, 3.0, 3.0, cv::viz::Color::green());
-        auto vis_pred = visualizeTrajectory(predicted_points_3d, 1, 3.0, 3.0, cv::viz::Color::red());
+        // auto vis_pred = visualizeTrajectory(predicted_points_3d, 1, 3.0, 3.0, cv::viz::Color::red());
         auto vis_corrected = visualizeTrajectory(corrected_points_3d, 1, 3.0, 3.0, cv::viz::Color::blue());
         auto vis_3d = visualizeTrajectory(points_3d, 0.3, -1, 1.0, cv::viz::Color::yellow());
 
-        std::vector<std::string> names = {"Trajectory", "Predicted Trajectory", "Corrected Trajectory", "3D Points"};
-        std::vector<std::optional<TrajectoryVisualization>> vis_list = {vis, vis_pred, vis_corrected, vis_3d};
+        // std::vector<std::string> names = {"Trajectory", "Predicted Trajectory", "Corrected Trajectory", "3D Points"};
+        std::vector<std::string> names = {"Trajectory", "Corrected Trajectory", "3D Points"};
+        // std::vector<std::optional<TrajectoryVisualization>> vis_list = {vis, vis_pred, vis_corrected, vis_3d};
+        std::vector<std::optional<TrajectoryVisualization>> vis_list = {vis, vis_corrected, vis_3d};
 
         for (size_t i = 0; i < vis_list.size(); ++i) {
             if (vis_list[i].has_value()) {

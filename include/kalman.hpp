@@ -93,13 +93,13 @@ cv::Mat euler2rot(const cv::Mat & euler)
 
 
 // Need to declare our KF, then init with this func, then use the update function instead of our separate predict/correct funcs
-void initKalmanFilter(KalmanFilter &KF, int nStates, int nMeasurements, int nInputs, double dt)
+void initKalmanFilter(cv::KalmanFilter &KF, int nStates, int nMeasurements, int nInputs, double dt)
 {
     KF.init(nStates, nMeasurements, nInputs, CV_64F);                 // init Kalman Filter
 
-    setIdentity(KF.processNoiseCov, Scalar::all(1e-5));       // set process noise
-    setIdentity(KF.measurementNoiseCov, Scalar::all(1e-2));   // set measurement noise
-    setIdentity(KF.errorCovPost, Scalar::all(1));             // error covariance
+    setIdentity(KF.processNoiseCov, cv::Scalar::all(1e-5));       // set process noise
+    setIdentity(KF.measurementNoiseCov, cv::Scalar::all(1e-2));   // set measurement noise
+    setIdentity(KF.errorCovPost, cv::Scalar::all(1));             // error covariance
 
     /** DYNAMIC MODEL (18 parameters) **/
 
@@ -163,14 +163,14 @@ void initKalmanFilter(KalmanFilter &KF, int nStates, int nMeasurements, int nInp
 }
 
 /**********************************************************************************************************/
-void updateKalmanFilter( KalmanFilter &KF, Mat &measurement,
-                         Mat &translation_estimated, Mat &rotation_estimated )
+void updateKalmanFilter( cv::KalmanFilter &KF, cv::Mat &measurement,
+                        cv::Mat &translation_estimated,cv::Mat &rotation_estimated )
 {
     // First predict, to update the internal statePre variable
-    Mat prediction = KF.predict();
+    cv::Mat prediction = KF.predict();
 
     // The "correct" phase that is going to use the predicted value and our measurement
-    Mat estimated = KF.correct(measurement);
+    cv::Mat estimated = KF.correct(measurement);
 
     // Estimated translation
     translation_estimated.at<double>(0) = estimated.at<double>(0);
@@ -178,7 +178,7 @@ void updateKalmanFilter( KalmanFilter &KF, Mat &measurement,
     translation_estimated.at<double>(2) = estimated.at<double>(2);
 
     // Estimated euler angles
-    Mat eulers_estimated(3, 1, CV_64F);
+    cv::Mat eulers_estimated(3, 1, CV_64F);
     eulers_estimated.at<double>(0) = estimated.at<double>(9);
     eulers_estimated.at<double>(1) = estimated.at<double>(10);
     eulers_estimated.at<double>(2) = estimated.at<double>(11);
@@ -188,11 +188,11 @@ void updateKalmanFilter( KalmanFilter &KF, Mat &measurement,
 }
 
 /**********************************************************************************************************/
-void fillMeasurements( Mat &measurements,
-                       const Mat &translation_measured, const Mat &rotation_measured)
+void fillMeasurements( cv::Mat &measurements,
+                       const cv::Mat &translation_measured, const cv::Mat &rotation_measured)
 {
     // Convert rotation matrix to euler angles
-    Mat measured_eulers(3, 1, CV_64F);
+    cv::Mat measured_eulers(3, 1, CV_64F);
     measured_eulers = rot2euler(rotation_measured);
 
     // Set measurement to predict

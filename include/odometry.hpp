@@ -63,12 +63,10 @@ public:
 
 
 class MapBasedVOEstimator
+{
 public:
     MapBasedVOEstimator(const std::vector<cv::Point3f>& map_points) : map_points_(map_points) {}
-    OdometryStatus estiamteGlobalMotion(std::vector<cv::Point2f>& pts_prev, std::vector<cv::Point2f>& pts_curr, const cv::Mat& K)
-    {
-        return status;
-    }
+    OdometryStatus estiamteGlobalMotion(std::vector<cv::Point2f>& pts_prev, std::vector<cv::Point2f>& pts_curr, const cv::Mat& K);
 
 private:
     std::vector<cv::Point3f> map_points_;

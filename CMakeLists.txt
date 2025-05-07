@@ -17,6 +17,7 @@ SET(CMAKE_CXX_FLAGS "-D DEBUG -Wall -Wfatal-errors -Wextra -Wno-unused-variable"
 find_package(Eigen3 REQUIRED)
 message(STATUS "Eigen Version: ${EIGEN3_VERSION_STRING} ${EIGEN3_VERSION}")
 
+find_package(Open3D REQUIRED)
 
 ##################### OpenCV ######################
 # Find installed OpenCV
@@ -41,4 +42,5 @@ add_executable(vo_epipolar ${SOURCES})
 target_link_libraries(vo_epipolar 
                       ${OpenCV_LIBS} 
                       Eigen3::Eigen
+                      Open3D::Open3D
                       )

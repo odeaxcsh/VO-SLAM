@@ -1,6 +1,5 @@
 #include "odometry.hpp"
 
-
 void VOEstimator::estimatePose(
     OdometryStatus& status,
     const cv::Mat& K

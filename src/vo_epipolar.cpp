@@ -11,6 +11,7 @@
 #include "opencv2/opencv.hpp"
 #include <opencv2/core/persistence.hpp>
 #include <opencv2/core/utils/filesystem.hpp>
+#include "opencv2/viz.hpp" // OpenCV Viz module for 3D visulalization
 #include <opencv2/core/eigen.hpp>
 
 
@@ -193,7 +194,7 @@ int main()
 
 
     bool initialized = false;
-    MotionKalmanFilter basic_kalman_filter;
+    // MotionKalmanFilter kalman_filter;
     cv::KalmanFilter kalman_filter;
 
     //std::vector<cv::Point3d> trajectory;
@@ -250,8 +251,9 @@ int main()
         cv::Matx<double, 3, 3> R = camera_pose_affine.rotation();
         cv::Vec3d t = camera_pose_affine.translation();
         
-        // cv::Mat R_est = cv::Mat(R);
-        // cv::Mat t_est = cv::Mat(t);
+        // RH: Create copies (should really declare these above the loop for speed, but unsure it matters)
+        cv::Mat R_est = cv::Mat(R);
+        cv::Mat t_est = cv::Mat(t);
 
         double x = t[0], y = t[1], z = t[2];
         cv::String info = cv::format("Inliers: %d (%d%%),  XYZ: [%.3f, %.3f, %.3f]", status.inlier_num, status.inlier_ratio*100, x, y, z);
@@ -260,36 +262,54 @@ int main()
 
 
         if (!initialized) {
-            basic_kalman_filter.initialize(t);
+            // kalman_filter.initialize(cam_pos);
 
             // RH: 9 pos + 9 orient (dynamics), 3 xyz + 3 rpy (measurement), 0 u (controls), fps=1/30
-            // initKalmanFilter(kalman_filter, 18, 6, 0, (1/30));
+            initKalmanFilter(kalman_filter, 18, 6, 0, (1/30));
             initialized = true;
         }
-        cv::Point3d predicted_pos = basic_kalman_filter.predict();
-        Eigen::Vector3d filtered_pos = cvMatToEigen((cv::Mat)basic_kalman_filter.correct(t), 3, 1);
+        // cv::Point3d predicted_pos = kalman_filter.predict();
+        // cv::Point3d filtered_pos = kalman_filter.correct(cam_pos);
 
-        // fillMeasurements( measurements, t_est, R_est );
-        // updateKalmanFilter( kalman_filter, measurements, t_est, R_est);
-        // Eigen::Vector3d t_corr = cvMatToEigen(t_est, 3, 1);
+        // RH: Should only update measurement vector if the latest estimate is good!!!
+        // if (bgoodMeasurement) {...}
+        fillMeasurements( measurements, t_est, R_est );
 
-        // trajectory_points_eigen.push_back(t_corr);
+        // RH: Should I have this return the prediction too?
+        // cv::Mat t_est(3, 1, CV_64FC1);
+        // cv::Mat R_est(3, 3, CV_64FC1);
+        updateKalmanFilter( kalman_filter, measurements, t_est, R_est);
 
-        // // --- Write estimated pose ---
-        // Eigen::Quaterniond q((Eigen::Matrix3d) cvMatToEigen(R_est, 3, 3));
-        // q.normalize();
-        // fprintf(estimated_traj, "%.6f %.6f %.6f %.6f %.6f %.6f %.6f %.6f\n",
-        //         timestamps[frame_idx],
-        //         t_corr(0), t_corr(1), t_corr(2),
-        //         q.x(), q.y(), q.z(), q.w());
+        // RH: USE t_est as corrected position!!! AND USE R_est as corrected orientation!!!
+        Eigen::Vector3d t_corr = cvMatToEigen(t_est, 3, 1);
 
-        trajectory_points_eigen.push_back(filtered_pos);
-        Eigen::Matrix3d Re = cvMatToEigen(cv::Mat(R), 3, 3);
-        Eigen::Quaterniond q(Re);
+
+
+        trajectory_points_eigen.push_back(t_corr);
+        // predicted_points_3d.push_back(t_pred);
+        original_traj.push_back(t); // RH: Are filtered_pos and cam_pos not the same?
+
+        // Use estimated and corrected R_est and t_est pose
+        for (int i = 0; i < status.pts_3d.size(); i++) {
+            if (status.inlier_mask.at<uchar>(i) > 0) {
+                cv::Point3d p = status.pts_3d[i];
+                cv::Mat p_vec = (cv::Mat_<double>(3,1) << p.x, p.y, p.z);
+                cv::Mat p_rotated = (R_est * p_vec);
+                cv::Mat p_trans = p_rotated + t_est;
+                points_3d.push_back(cv::Point3d(
+                    p_trans.at<double>(0),
+                    p_trans.at<double>(1),
+                    p_trans.at<double>(2)
+                ));
+            }
+        }
+
+        // --- Write estimated pose ---
+        Eigen::Quaterniond q((Eigen::Matrix3d) cvMatToEigen(R_est, 3, 3));
         q.normalize();
         fprintf(estimated_traj, "%.6f %.6f %.6f %.6f %.6f %.6f %.6f %.6f\n",
                 timestamps[frame_idx],
-                filtered_pos(0), filtered_pos(1), filtered_pos(2),
+                t_corr(0), t_corr(1), t_corr(2),
                 q.x(), q.y(), q.z(), q.w());
 
         // --- Update 3D visualization ---
@@ -305,10 +325,8 @@ int main()
         }
 
         Eigen::Matrix4d current_pose = Eigen::Matrix4d::Identity();
-        // current_pose.block<3,3>(0,0) = cvMatToEigen(R_est, 3, 3);
-        // current_pose.block<3,1>(0,3) = cvMatToEigen(t_est, 3, 1);
-        current_pose.block<3,3>(0,0) = Re;
-        current_pose.block<3,1>(0,3) = filtered_pos;
+        current_pose.block<3,3>(0,0) = cvMatToEigen(R_est, 3, 3);
+        current_pose.block<3,1>(0,3) = cvMatToEigen(t_est, 3, 1);
 
         auto new_frustum = open3d::geometry::LineSet::CreateCameraVisualization(
             width, height, K, current_pose.inverse(), 0.5);
